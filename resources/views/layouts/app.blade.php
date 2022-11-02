@@ -15,7 +15,7 @@
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100 select-none">
+        <div id="pageDiv" class="min-h-screen select-none {{ App\Models\Setting::all()->find(auth()->user()->id)->theme == 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100' }}">
             @include('layouts.navigation')
 
             <!-- Page Content -->

@@ -5,19 +5,18 @@
   var oldName;
   var updatescroll;
   var updatemessages;
-  var updatetyping;
-  var checktyping;
+  var checktypers;
+  var checkfortyping;
+  var currentlyChattingWith = "All";
+  changeIcon("chat");
 
   window.onload = function () {
     addIntervals();
-    changeIcon("chat");
   }
 
   function addIntervals() {
-    updatescroll = setInterval(updateScroll, 0);
-    updatemessages = setInterval(updateMessages, 100);
-    updatetyping = setInterval(checkTypers, 100);
-    checktyping = setInterval(checkForTyping, 100);
+    updatemessages = setInterval(updateMessages, 1000);
+    checkfortyping = setInterval(checkForTyping, 0);
   }
   
   function messageScroll() {
@@ -37,35 +36,32 @@
   
   function sendMessage() {
     if ($("#message").val() === "//clear-all-messages" && {{ auth()->user()->id }} === 1) {
-      $.ajax({
-        type: 'GET',
-        url: "/clear-all-messages",
-        success: function (data) {
-          $("#message").val("");
-        }
-      });
+      fetch('/clear-all-messages?to=' + currentlyChattingWith);
+    } else if ($("#message").val() === "//reset-message-table" && {{ auth()->user()->id }} === 1) {
+      fetch('/reset-message-table');
     } else if ($("#message").val() !== "") {
-      fetch('/send-message?message=' + $("#message").val());
-      $("#message").val("");
+      fetch('/send-message?message=' + $("#message").val() + "&to=" + currentlyChattingWith);
     }
+    $("#message").val("");
   }
 
   function updateMessages() {
-    $("#data").load("/get-messages", function () {
-      var loadedMessages = JSON.parse($("#data").html());
+    $("#data").load("/get-messages?to=" + currentlyChattingWith, function () {
+      var data = JSON.parse($("#data").html());
+      $("#message").attr("placeholder", "Message " + data["to"]);
       $("#messages").html("");
-      for (i = 0; i < loadedMessages["messages"].length; i++) {
+      for (i = 0; i < data["messages"].length; i++) {
         var newMessage = document.createElement("div");
         var name = document.createElement("div");
-        newMessage.innerHTML = loadedMessages["messages"][i]["message"];
-        if (loadedMessages["messages"][i]["users_id"] === JSON.stringify({{ auth()->user()->id }})) {
-          newMessage.className = "bg-gradient-to-l from-indigo-500 to-blue-500 ml-auto m-4 w-fit max-w-[50%] p-3 rounded-2xl rounded-tr-none text-white text-2xl";
-          name.className = "ml-auto w-fit max-w-[50%] mx-4 text-2xl text-right";
+        newMessage.innerHTML = data["messages"][i]["message"];
+        if (data["messages"][i]["users_id"] === JSON.stringify({{ auth()->user()->id }})) {
+          newMessage.className = "bg-gradient-to-l from-indigo-500 to-blue-500 ml-auto m-4 w-fit max-w-[50%] overflow-x-hidden p-3 rounded-2xl rounded-tr-none text-white text-2xl";
+          name.className = "ml-auto w-fit max-w-[50%] overflow-x-hidden mx-4 text-2xl text-right";
         } else {
-          newMessage.className = "bg-gray-400 mr-auto m-4 w-fit max-w-[50%] p-3 rounded-2xl rounded-tl-none text-white text-2xl";
+          newMessage.className = "bg-gray-400 mr-auto m-4 w-fit max-w-[50%] overflow-x-hidden p-3 rounded-2xl rounded-tl-none text-white text-2xl";
           name.className = "mr-auto w-fit max-w-[50%] mx-4 text-2xl text-left";
         }
-        name.innerHTML = loadedMessages["from"][loadedMessages["messages"][i]["users_id"] - 1].name;
+        name.innerHTML = data["from"][data["messages"][i]["users_id"] - 1];
         if (oldName !== name.innerHTML || i === 0) {
           document.querySelector("#messages").appendChild(name);
           oldName = name.innerHTML;
@@ -75,14 +71,35 @@
       if (document.querySelector("#messages").innerHTML === "") {
         document.querySelector("#messages").innerHTML = "<div class='w-full text-center text-2xl'>No messages posted yet...</div>";
       } 
+
+      if (data["currentlyTyping"].length !== 0) {
+        $("#currentlyTyping").html("");
+        $("#currentlyTyping").html(data["currentlyTyping"][0]);
+        for (i = 1; i < data["currentlyTyping"].length; i++) {
+          $("#currentlyTyping").html($("#currentlyTyping").html() + ", " + data["currentlyTyping"][i]);
+        }
+        $("#currentlyTyping").html($("#currentlyTyping").html() + " is typing...");
+        $("#currentlyTyping").slideDown(200);
+      } else {
+        $("#currentlyTyping").slideUp(200);
+      }
+      updateScroll();
     });
+  }
+
+  function openChat(id) {
+    clearInterval(updatemessages);
+    currentlyChattingWith = id;
+    updatemessages = setInterval(updateMessages, 1000);
+    changeIcon("chat");
   }
 
   function chat() {
     resetToHidden();
     document.querySelector("#message-bar").classList.replace("-bottom-full", "bottom-0");
+    document.querySelector("#messages").classList.replace("bottom-full", "bottom-20");
     document.querySelector("#messages").classList.replace("-top-full", "top-0");
-    document.querySelector("#messages").classList.replace("bottom-full", "bottom-12");
+    setTimeout(messageScroll, 300);
     setTimeout(addIntervals, 510);
   }
 
@@ -96,24 +113,38 @@
 
   function group() {
     resetToHidden();
+    document.querySelector("#groupsHeader").classList.replace("bottom-full", "bottom-0");
+    document.querySelector("#groupsHeader").classList.replace("-top-full", "top-0");
+    document.querySelector("#groupsSettings").classList.replace("top-full", "top-0");
+    document.querySelector("#groupsSettings").classList.replace("-bottom-full", "bottom-0");
   }
 
   function settings() {
     resetToHidden();
+    document.querySelector("#settingsHeader").classList.replace("bottom-full", "bottom-0");
+    document.querySelector("#settingsHeader").classList.replace("-top-full", "top-0");
+    document.querySelector("#settingsSettings").classList.replace("top-full", "top-0");
+    document.querySelector("#settingsSettings").classList.replace("-bottom-full", "bottom-0");
   }
 
   function resetToHidden() {
     document.querySelector("#message-bar").classList.replace("bottom-0", "-bottom-full");
     document.querySelector("#messages").classList.replace("top-0", "-top-full");
-    document.querySelector("#messages").classList.replace("bottom-12", "bottom-full");
+    document.querySelector("#messages").classList.replace("bottom-20", "bottom-full");
     document.querySelector("#accountHeader").classList.replace("bottom-0", "bottom-full");
     document.querySelector("#accountHeader").classList.replace("top-0", "-top-full");
     document.querySelector("#accountSettings").classList.replace("top-0", "top-full");
     document.querySelector("#accountSettings").classList.replace("bottom-0", "-bottom-full");
-    clearInterval(updatescroll);
+    document.querySelector("#settingsHeader").classList.replace("bottom-0", "bottom-full");
+    document.querySelector("#settingsHeader").classList.replace("top-0", "-top-full");
+    document.querySelector("#settingsSettings").classList.replace("top-0", "top-full");
+    document.querySelector("#settingsSettings").classList.replace("bottom-0", "-bottom-full");
+    document.querySelector("#groupsHeader").classList.replace("bottom-0", "bottom-full");
+    document.querySelector("#groupsHeader").classList.replace("top-0", "-top-full");
+    document.querySelector("#groupsSettings").classList.replace("top-0", "top-full");
+    document.querySelector("#groupsSettings").classList.replace("bottom-0", "-bottom-full");
     clearInterval(updatemessages);
-    clearInterval(checkTypers);
-    clearInterval(checkForTyping);
+    clearInterval(checkfortyping);
   }
 
   function confirmMessage(message) {
@@ -147,28 +178,10 @@
       isTyping = false;
     }
   }
-
-  function checkTypers() {
-    $.ajax({
-      url: "/currently-typing",
-      success: function (data) {
-          if (data["currentlyTyping"].length !== 0) {
-            $("#currentlyTyping").html("");
-            $("#currentlyTyping").html(data["currentlyTyping"][0].currentlyTyping);
-            for (i = 1; i < data["currentlyTyping"].length; i++) {
-              $("#currentlyTyping").html($("#currentlyTyping").html() + ", " + data["currentlyTyping"][i].currentlyTyping);
-            }
-            $("#currentlyTyping").html($("#currentlyTyping").html() + " is typing...");
-          } else {
-            $("#currentlyTyping").html("");
-          }
-      }
-    });
-  }
   
   function changeIcon(icon) {
     resetIcons();
-    $("#" + icon).toggleClass("bg-blue-300");
+    $("#" + icon).toggleClass("bg-blue-500");
     $("#" + icon).html(getIconSelected(icon));
     if (icon === "chat") {
       chat();
@@ -186,10 +199,10 @@
     $("#account").html('<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" /></svg>');
     $("#group").html('<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>');
     $("#settings").html('<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>');
-    $("#chat").removeClass("bg-blue-300");
-    $("#account").removeClass("bg-blue-300");
-    $("#group").removeClass("bg-blue-300");
-    $("#settings").removeClass("bg-blue-300");
+    $("#chat").removeClass("bg-blue-500");
+    $("#account").removeClass("bg-blue-500");
+    $("#group").removeClass("bg-blue-500");
+    $("#settings").removeClass("bg-blue-500");
   }
 
   function openMenu() {
